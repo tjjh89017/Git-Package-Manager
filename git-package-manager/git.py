@@ -19,8 +19,42 @@ class Git(object):
         refs = Git.list_remote(url)
         print(refs, file=sys.stderr)
 
+        # communicate with Git via stdin and stdout
+
+        while True:
+            try:
+                line = sys.stdin.readline()
+                print(repr(line), file=sys.stderr)
+                if line == "capabilities\n":
+                    sys.stdout.write("fetch\n\n")
+                    sys.stdout.flush()
+                elif line == "list\n":
+                    for branch in refs:
+                        sys.stdout.write("{} {}\n".format(refs[branch], branch))
+                    sys.stdout.write("\n")
+                    sys.stdout.flush()
+                elif line.startswith('fetch'):
+
+                    _, sha1, name = line.split(' ')
+                    if name.endswith("\n"):
+                        name = name.rstrip()
+                    #print(line, file=sys.stderr)
+                    print(repr(sha1), file=sys.stderr)
+                    print(repr(name), file=sys.stderr)
+                    # TODO Fetch
+
+                    print(Git._exec(['git', 'fetch-pack', '--depth=1', url, name], stdout=PIPE, stderr=PIPE, stdin=PIPE), file=sys.stderr)
+
+                    sys.stdout.write("\n")
+                else:
+                    sys.stdout.write("\n")
+                    break
+            except EOFError:
+                break
+
     def _exec(cmd, *args, **kwargs):
-        pass
+        proc = subprocess.Popen(cmd, *args, **kwargs)
+        return proc.communicate()
 
     def list_remote(url):
         proc = subprocess.Popen(['git', 'ls-remote', url], stdout=PIPE, stderr=PIPE, stdin=PIPE)
@@ -34,6 +68,6 @@ class Git(object):
             print(repr(line), file=sys.stderr)
             print(repr(line.split("\t")), file=sys.stderr)
             sha1, branch = line.split("\t")
-            refs[sha1] = branch
+            refs[branch] = sha1
 
         return refs
