@@ -14,7 +14,7 @@ class Git(object):
 
         remotename = argv[1]
         url = argv[2]
-        url = re.sub(r'^gpm:', 'git:', url)
+        url = re.sub(r'^gpm:', 'https:', url)
 
         refs = Git.list_remote(url)
         print(refs, file=sys.stderr)
