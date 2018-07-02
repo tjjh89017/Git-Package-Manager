@@ -42,8 +42,7 @@ class Git(object):
                     print(repr(sha1), file=sys.stderr)
                     print(repr(name), file=sys.stderr)
                     # TODO Fetch
-
-                    print(Git._exec(['git', 'fetch-pack', '--depth=1', url, name], stdout=PIPE, stderr=PIPE, stdin=PIPE), file=sys.stderr)
+                    # DO FETCH and DO CHECKOUT
 
                     sys.stdout.write("\n")
                 else:
