@@ -3,13 +3,15 @@
 
 import subprocess
 from subprocess import PIPE
-import re
 from pathlib import Path
-import urllib
-import urllib.request
+from collections import deque
 
+import hashlib
+import re
 import os
 import sys
+import zlib
+import github3
 
 # This should be a static class to collect all git method
 class Git(object):
@@ -55,7 +57,68 @@ class Git(object):
                     print(GIT_DIR, file=sys.stderr)
                     print(GIT_WORK_TREE, file=sys.stderr)
 
-                    Git._exec(['git', 'fetch-pack', '-v', '--depth=1', url, sha1])
+                    # get commit and tree from github api
+                    # TODO we need a interface
+                    # for now only support Github
+                    assert 'github.com' in url
+
+                    github = github3.GitHub()
+
+                    # find username and repo name
+                    username, reponame = re.search(r'.*://[^/]*/([^/]*)/([^/]*)/?', url).group(1, 2)
+                    repo = github.repository(username, reponame)
+                    commit = repo.git_commit(sha1)
+                    print(repr(commit), file=sys.stderr)
+                    print(repr(commit.tree.sha), file=sys.stderr)
+                    print(repr(commit.author), file=sys.stderr)
+                    #tree = repo.tree(commit.tree.sha)
+
+                    # now we found the tree
+                    # MUST check the tree existed in .git/
+                    # walk for all tree node and if not existed and download it
+                    # we need to pack the tree to git object format
+                    # TODO we don't care 'truncated', that will be a problem
+                    def dfs(path, tree_sha):
+                        # check if tree_sha existed
+                        # TODO for now we assume we have no tree
+
+                        tree = repo.tree(tree_sha).tree
+                        # save tree object
+                        os.makedirs(os.path.join(GIT_DIR, 'objects', tree_sha[:2]), exist_ok=True)
+                        frame = bytearray()
+                        for node in tree:
+                            print(node.path, file=sys.stderr)
+                            frame.extend(node.mode.encode('ascii'))
+                            frame.extend(b' ')
+                            frame.extend(node.path.encode('utf-8'))
+                            frame.append(0)
+                            frame.extend(bytearray.fromhex(node.sha))
+
+                        print(repr(os.path.join(GIT_DIR, 'objects', tree_sha[:2], tree_sha[2:])), file=sys.stderr)
+                        tree_object = Path(os.path.join(GIT_DIR, 'objects', tree_sha[:2], tree_sha[2:]))
+
+                        print(tree_sha, file=sys.stderr)
+
+                        frame = b'tree ' + str(len(frame)).encode('ascii') + b'\x00' + frame
+                        print(repr(frame), file=sys.stderr)
+                        print(hashlib.sha1(frame).hexdigest(), file=sys.stderr)
+
+                        with tree_object.open('wb') as f:
+                            f.write(zlib.compress(frame, level=1))
+
+                        for node in tree:
+                            # if tree, dfs
+                            if node.type == 'tree':
+                                #print(path, file=sys.stderr)
+                                dfs("{}/{}".format(path, node.path), node.sha)
+                            else:
+                                #print("{} {}/{}".format(node.sha, path, node.path), file=sys.stderr)
+                                pass
+
+                    tree_sha = commit.tree.sha
+                    dfs('.', tree_sha)
+
+                    # TODO write commit object!
 
                     sys.stdout.write("\n")
                 else:
