@@ -4,7 +4,11 @@
 import subprocess
 from subprocess import PIPE
 import re
+from pathlib import Path
+import urllib
+import urllib.request
 
+import os
 import sys
 
 # This should be a static class to collect all git method
@@ -14,7 +18,8 @@ class Git(object):
 
         remotename = argv[1]
         url = argv[2]
-        url = re.sub(r'^gpm:', 'https:', url)
+        url = re.sub(r'^gpm:', 'git:', url)
+        url = url.rstrip('/')
 
         refs = Git.list_remote(url)
         print(refs, file=sys.stderr)
@@ -43,6 +48,14 @@ class Git(object):
                     print(repr(name), file=sys.stderr)
                     # TODO Fetch
                     # DO FETCH and DO CHECKOUT
+
+                    GIT_DIR = os.environ['GIT_DIR']
+                    GIT_WORK_TREE = Path(GIT_DIR).parent
+                    GIT_WORK_TREE = os.environ.get('GIT_WORK_TREE', GIT_WORK_TREE)
+                    print(GIT_DIR, file=sys.stderr)
+                    print(GIT_WORK_TREE, file=sys.stderr)
+
+                    Git._exec(['git', 'fetch-pack', '-v', '--depth=1', url, sha1])
 
                     sys.stdout.write("\n")
                 else:
